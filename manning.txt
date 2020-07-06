@@ -1,0 +1,89 @@
+Public Sub ProcessRibbon(Control As IRibbonControl)
+
+    Dim permission As Boolean
+    permission = False
+   
+'    If check_permission(permission) = False Then
+'    MsgBox "You do not have permission to use this"
+'    Exit Sub
+'    End If
+    Select Case Control.ID
+        'call different macro based on button name pressed
+        Case "leave"
+            For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(0, 255, 0)
+            Next
+        Case "course"
+            For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(0, 162, 232)
+            Next
+        Case "clear"
+            Module1.clear
+        Case "sport"
+            For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(255, 192, 0)
+            Next
+        Case "sick"
+            For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(255, 100, 200)
+            Next
+        Case "duty"
+            For Each cell In Selection
+                If cell.Column >= 3 Then
+                With Selection.Borders(xlDiagonalUp)
+                    .LineStyle = xlContinuous
+                    .ColorIndex = xlAutomatic
+                    .TintAndShade = 0
+                    .Weight = xlThick
+                End With
+                End If
+            Next
+        Case "block"
+             For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(0, 0, 0)
+             Next
+        Case "det"
+             For Each cell In Selection
+                If cell.Column >= 3 Then cell.Interior.Color = RGB(102, 0, 102)
+            Next
+        
+    End Select
+End Sub
+
+Sub clear()
+
+For Each cell In Selection
+
+Select Case Cells(2, cell.Column).Value
+
+Case "Sat", "Sun"
+If cell.Row Mod 2 = 0 Then
+cell.clear
+cell.Interior.Color = RGB(100, 100, 100)
+Else
+cell.clear
+cell.Interior.Color = RGB(50, 50, 50)
+End If
+Case Else
+If cell.Column >= 3 Then cell.clear
+End Select
+
+cell.Borders(xlEdgeLeft).LineStyle = xlContinuous
+cell.Borders(xlEdgeTop).LineStyle = xlContinuous
+cell.Borders(xlEdgeBottom).LineStyle = xlContinuous
+cell.Borders(xlEdgeRight).LineStyle = xlContinuous
+cell.Borders(xlInsideVertical).LineStyle = xlContinuous
+cell.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Next
+End Sub
+
+'Function check_permission(ByRef permission As Boolean) As Boolean
+'
+'For Each person In Cells(10, 2).Resize(5)
+'    If person = Application.UserName Then
+'    permission = True
+'    Exit For
+'    End If
+'Next
+'check_permission = permission
+'End Function

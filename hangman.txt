@@ -1,0 +1,113 @@
+Public hangman As Worksheet
+Public word As Shape
+Public remaining As Shape
+Public used As Shape
+Public under As Shape
+Public lives As Shape
+
+Sub guess_letter()
+
+Set hangman = Sheet3
+Set word = hangman.Shapes("word")
+Set remaining = hangman.Shapes("remaining")
+Set used = hangman.Shapes("used")
+Set under = hangman.Shapes("under")
+Set lives = hangman.Shapes("lives")
+
+guess = InputBox("Choose a letter!")
+lettersleft = Len(word.TextFrame2.TextRange.Characters)
+lives_left = Right(lives.TextFrame2.TextRange.Characters, 2)
+
+For Each l In used.TextFrame2.TextRange.Characters
+
+If UCase(guess) = l Then
+    MsgBox ("You have already chosen this letter, you should choose more carefully!")
+    Exit Sub
+End If
+Next
+
+pos = 0
+correct = 0
+For Each l In word.TextFrame2.TextRange.Characters
+pos = pos + 1
+If l = UCase(guess) Then
+    correct_letter = under.TextFrame2.TextRange.Characters
+    correct_letter = Mid(correct_letter, 1, pos - 1) & Replace(correct_letter, "-", UCase(guess), start:=pos, Count:=1)
+    under.TextFrame2.TextRange.Characters.Text = correct_letter
+    correct = 1
+End If
+Next
+
+If correct = 0 Then
+    lives_left = lives_left - 1
+    lives.TextFrame2.TextRange.Characters.Text = "Lives: " & lives_left
+End If
+
+If lives_left = 0 Then
+    under.TextFrame2.TextRange.Characters.Text = word.TextFrame2.TextRange.Characters.Text
+End If
+
+For Each char In under.TextFrame2.TextRange.Characters
+    If char <> "-" Then
+        lettersleft = lettersleft - 1
+    End If
+Next
+
+used.TextFrame2.TextRange.Characters.Text = used.TextFrame2.TextRange.Characters.Text & " " & UCase(guess)
+remaining.TextFrame2.TextRange.Characters.Text = "Letters Remaining: " & lettersleft
+
+End Sub
+
+Sub new_game()
+
+Set hangman = Sheet3
+Set word = hangman.Shapes("word")
+Set remaining = hangman.Shapes("remaining")
+Set used = hangman.Shapes("used")
+Set under = hangman.Shapes("under")
+Set lives = hangman.Shapes("lives")
+
+word:
+word_choice = InputBox("Choose new word(s)")
+If Len(word_choice) < 3 Then
+    MsgBox "Minimum word length is 3"
+    GoTo word
+End If
+set_lives:
+number_lives = InputBox("Set number of lives")
+If Not IsNumeric(number_lives) Then
+    MsgBox "Enter a valid number"
+    GoTo set_lives
+End If
+under.TextFrame2.TextRange.Characters.Text = ""
+
+For x = 1 To Len(word_choice)
+
+Select Case LCase(Mid(word_choice, x, 1))
+
+Case "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d", "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+    under.TextFrame2.TextRange.Characters.Text = under.TextFrame2.TextRange.Characters.Text & "-"
+Case " "
+    under.TextFrame2.TextRange.Characters.Text = under.TextFrame2.TextRange.Characters.Text & "/"
+Case Else
+    MsgBox "C'mon, A-Z only ;)"
+    word.TextFrame2.TextRange.Characters.Text = ""
+    under.TextFrame2.TextRange.Characters.Text = ""
+    Exit Sub
+End Select
+
+Next
+
+n = 0
+For Each c In under.TextFrame2.TextRange.Characters
+If c = "/" Then
+    c.Font.Fill.ForeColor.RGB = RGB(0, 0, 0)
+    n = n + 1
+End If
+Next
+word.TextFrame2.TextRange.Characters.Text = UCase(word_choice)
+remaining.TextFrame2.TextRange.Characters.Text = "Letters Remaining: " & (Len(word_choice) - n)
+used.TextFrame2.TextRange.Characters.Text = ""
+lives.TextFrame2.TextRange.Characters.Text = "Lives: " & number_lives
+
+End Sub

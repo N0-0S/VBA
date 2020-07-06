@@ -1,0 +1,482 @@
+Public dice As Shape
+Public bg As Worksheet
+Public data As Worksheet
+
+Sub game_loop()
+
+Dim active_player_name As String
+Dim active_player As Integer
+Dim current_sq As Integer
+Dim next_square As String
+Set bg = Sheet5
+
+'get the active player
+For Each player In bg.Shapes("players").GroupItems
+    If player.Line.ForeColor.RGB = RGB(0, 255, 0) And player.Visible = True Then
+    active_player_name = bg.Shapes("p" & Right(player.Name, 1)).TextFrame2.TextRange.Characters.Text
+    active_player = Right(player.Name, 1)
+    End If
+Next
+
+'get the active players current position and remove the players initial from the board
+'factors in multiple players on 1 square
+For Each sh In bg.Shapes("boardspaces").GroupItems
+    If InStr(1, sh.TextFrame2.TextRange.Characters.Text, Left(active_player_name, 1)) Then
+        If Len(sh.Name) = 2 Then
+            current_sq = Right(sh.Name, 1)
+        Else: current_sq = Right(sh.Name, 2)
+        End If
+        For Each letter In sh.TextFrame2.TextRange.Characters
+            on_space = Replace(letter, Left(active_player_name, 1), "", Count:=1)
+            still_on_space = still_on_space & on_space
+        Next
+        sh.TextFrame2.TextRange.Characters.Text = still_on_space
+        If sh.TextFrame2.TextRange.Characters.Text = "" Then sh.Fill.GradientStops(1).Position = 0
+    End If
+Next
+'highlight players owned properties
+Call highlight_assets_code(active_player)
+
+Call dice_roll(active_player_name, current_sq, active_player)
+
+next_player = active_player + 1
+If next_player > 4 Then next_player = 1
+    If bg.Shapes("p" & next_player).Visible = False Then next_player = 1
+bg.Shapes("line" & active_player).Visible = False
+bg.Shapes("line" & next_player).Visible = True
+
+active_player = next_player
+Call highlight_assets_code(active_player)
+
+End Sub
+
+Sub dice_roll(ByVal active_player_name, current_sq As Integer, active_player As Integer)
+
+Set bg = Sheet5
+Set dice = bg.Shapes("dice")
+
+Dim next_square As String
+'random number 1 to 6
+roll = Int((6 - 1 + 1) * Rnd + 1)
+dice.TextFrame2.TextRange.Characters.Text = roll
+
+'calculate new position and add £200 if you pass go
+If (roll + current_sq) > 39 Then
+    next_square = "s" & (roll + current_sq - 40)
+    player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2)
+    bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & (player_money + 200)
+Else: next_square = "s" & (roll + current_sq)
+End If
+
+'highlight new position on board
+With bg.Shapes(next_square)
+    .TextFrame2.TextRange.Characters.Text = .TextFrame2.TextRange.Characters.Text & Left(active_player_name, 1)
+    .Fill.GradientStops(1).Position = 0.9
+    .Fill.GradientStops(1).Color = RGB(0, 0, 0)
+    .Fill.GradientStops(1).Transparency = 0
+End With
+
+'wait now prevents a pop up message asking if you want to buy before the new position is highlighted
+Application.Wait (Now + TimeValue("00:00:01") / 2)
+'handle the new square the player lands on
+Call add_property(next_square, active_player, active_player_name)
+
+End Sub
+
+Sub set_player()
+
+Dim no_p As Shape
+
+Set no_p = ActiveSheet.Shapes(Application.Caller)
+Set bg = Sheet5
+
+warning = MsgBox("Warning! Changing the number of players will reset the current game", vbOKCancel)
+
+If warning = vbCancel Then Exit Sub
+If warning = vbOK Then Call reset
+
+For Each sh In bg.Shapes("gameOptions").GroupItems
+    If Left(sh.Name, 3) = "no_" Then
+        If sh.Line.Visible = True Then sh.Line.Visible = False
+    End If
+Next
+
+no_p.Line.Visible = True
+
+For Each player In bg.Shapes("Players").GroupItems
+    player.Visible = False
+    If Right(no_p.Name, 1) >= Right(player.Name, 1) Then player.Visible = True
+Next
+
+'starting_player = Int((4 - 1 + 1) * Rnd + 1)
+
+End Sub
+
+Sub selling_houses()
+
+Dim opt As Shape
+Set opt = ActiveSheet.Shapes(Application.Caller)
+Set bg = Sheet5
+For Each sh In bg.Shapes("gameOptions").GroupItems
+If Left(sh.Name, 3) = "sh_" Then
+        If sh.Line.Visible = True Then sh.Line.Visible = False
+    End If
+Next
+opt.Line.Visible = True
+
+End Sub
+
+Sub add_property(next_square As String, active_player As Integer, ByVal active_player_name)
+
+Set bg = Sheet5
+Set data = Sheet6
+
+For Each property_data In data.Cells(2, 1).Resize(40)
+    If property_data = next_square Then
+        property_row = property_data.Row
+        For Each player_owned In data.Cells(property_data.Row, 1).Offset(, 2).Resize(, 4)
+            If player_owned <> "" Then
+                sold = True
+                owner = player_owned.Column - 2
+                Exit For
+            Else: sold = False
+            End If
+        Next
+    End If
+Next
+
+If sold = True And owner <> active_player Then Call pay_player(active_player, owner, property_row, active_player_name)
+
+player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2)
+property_cost = data.Cells(property_row, 2).Value
+If IsNumeric(property_cost) Then
+    updated_money = player_money - data.Cells(property_row, 2).Value
+    If updated_money >= 0 Then
+        If sold = False Then buy = MsgBox("Would you like to purchase this property?", vbYesNo, "Purchase Property")
+            If buy = vbYes Then
+                bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & updated_money
+                data.Cells(property_row, active_player + 2) = "o"
+                Call check_complete_set(active_player, property_row)
+            End If
+    End If
+End If
+
+End Sub
+
+Sub pay_player(active_player As Integer, ByVal owner, ByVal property_row, ByVal active_player_name)
+
+Set bg = Sheet5
+Set data = Sheet6
+
+rent = data.Cells(property_row, owner + 2)
+
+Select Case rent
+
+Case "o"
+amount_to_pay = data.Cells(property_row, 7)
+Case "1"
+amount_to_pay = data.Cells(property_row, 8)
+Case "2"
+amount_to_pay = data.Cells(property_row, 9)
+Case "3"
+amount_to_pay = data.Cells(property_row, 10)
+Case "4"
+amount_to_pay = data.Cells(property_row, 11)
+Case "h"
+amount_to_pay = data.Cells(property_row, 12)
+Case "m"
+amount_to_pay = 0
+Case "s"
+'station formula
+Case "set"
+amount_to_pay = data.Cells(property_row, 7) * 2
+End Select
+
+MsgBox active_player_name & " paid " & amount_to_pay
+player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2) - amount_to_pay
+bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & player_money
+
+payee = Mid(bg.Shapes("money" & owner).TextFrame2.TextRange.Characters.Text, 2) + amount_to_pay
+bg.Shapes("money" & owner).TextFrame2.TextRange.Characters.Text = "£" & payee
+
+End Sub
+
+Sub highlight_player_assets()
+
+Set active_player_click = ActiveSheet.Shapes(Application.Caller)
+active_player = Right(active_player_click.Name, 1)
+Call highlight_assets_code(active_player)
+
+End Sub
+
+Sub highlight_assets_code(ByVal active_player)
+
+Set bg = Sheet5
+Set data = Sheet6
+
+For Each property In bg.Shapes("propertyCards").GroupItems
+     property.Fill.Transparency = 0.7
+Next
+
+For Each property_card In data.Cells(2, active_player + 2).Resize(40)
+    If property_card <> "" Then
+        For Each property In bg.Shapes("propertyCards").GroupItems
+            If property.Name = data.Cells(property_card.Row, 1) & "pc" Then
+                property.Fill.Transparency = 0
+            End If
+        Next
+    End If
+Next
+
+End Sub
+
+Sub check_complete_set(active_player As Integer, ByVal property_row)
+
+Set data = Sheet6
+
+full_set = True
+build_house = True
+property = data.Cells(property_row, 1).Value
+active_player_data = active_player + 2
+
+
+Select Case property
+
+Case "s1", "s3"
+
+For Each cell In data.Cells(2, active_player_data).Resize(2)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(2, active_player_data).Resize(2)
+    cell.Value = "set"
+Next
+End If
+
+Case "s6", "s8", "s9"
+
+For Each cell In data.Cells(4, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(4, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+
+Case "s11", "s13", "s14"
+
+For Each cell In data.Cells(7, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(7, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+    
+Case "s16", "s18", "s19"
+
+For Each cell In data.Cells(10, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(10, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+
+Case "s21", "s23", "s24"
+
+For Each cell In data.Cells(13, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(13, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+
+Case "s26", "s27", "s29"
+
+For Each cell In data.Cells(16, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(16, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+
+Case "s31", "s32", "s34"
+
+For Each cell In data.Cells(19, active_player_data).Resize(3)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(19, active_player_data).Resize(3)
+    cell.Value = "set"
+Next
+End If
+    
+Case "s37", "s39"
+
+For Each cell In data.Cells(22, active_player_data).Resize(2)
+    If cell.Value <> "o" And cell.Value <> "set" Then full_set = False
+    If cell.Value <> "set" Then build_house = False
+Next
+If full_set = True Then
+For Each cell In data.Cells(22, active_player_data).Resize(2)
+    cell.Value = "set"
+Next
+End If
+    
+End Select
+
+
+End Sub
+
+Sub reset()
+
+Set bg = Sheet5
+
+For Each sh In bg.Shapes("boardspaces").GroupItems
+    sh.TextFrame2.TextRange.Characters.Text = ""
+    sh.Fill.GradientStops(1).Position = 0
+Next
+
+For i = 1 To 4
+bg.Shapes("money" & i).TextFrame2.TextRange.Characters.Text = "£1500"
+Next
+
+End Sub
+
+Sub buy_sell_mortgage()
+
+Dim property As Shape
+Dim active_player As Integer
+Set bg = Sheet5
+Set data = Sheet6
+Set property = bg.Shapes(Application.Caller)
+last_property = data.Cells(Rows.Count, 2).End(xlUp).Row
+
+For Each player In bg.Shapes("players").GroupItems
+    If player.Line.ForeColor.RGB = RGB(0, 255, 0) And player.Visible = True Then
+    active_player_name = bg.Shapes("p" & Right(player.Name, 1)).TextFrame2.TextRange.Characters.Text
+    active_player = Right(player.Name, 1)
+    End If
+Next
+
+For Each property_row In data.Cells(1, 1).Resize(last_property)
+    If property_row = Left(property.Name, 2) Then
+        p_status = property_row.Offset(, active_player + 1)
+        
+        Select Case p_status
+        
+        Case "o"
+        mortgage_property = MsgBox("Would you like to mortgage this property?", vbYesNo, "Mortgage Property")
+        Call mortgage(active_player, property_row)
+        
+        Case "set", "1", "2", "3", "4"
+            house_cost = data.Cells(property_row.Row, 13).Value
+            house = MsgBox("Would you like to build on this property?" & vbNewLine & vbNewLine & "Price is £" & house_cost, vbYesNo, "Buy House/Hotel")
+            If house = vbNo Then
+                mortgage_property = MsgBox("Would you like to sell a house or mortgage this property?", vbYesNo, "Sell/Mortgage")
+                If mortgage_property = vbYes Then
+                    If p_status <> "set" Then
+                        Call refund_house(active_player, property_row)
+                    Else
+                        Call mortgage(active_player, property_row)
+                    End If
+                End If
+            ElseIf house = vbYes Then
+                
+                player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2) - house_cost
+                bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & player_money
+                If p_status = "set" Then
+                    p_status = 1
+                ElseIf p_status = 4 Then
+                    p_status = "h"
+                Else
+                    p_status = p_status + 1
+                End If
+                property_row.Offset(, active_player + 1) = p_status
+                MsgBox "Bought for £" & house_cost
+            End If
+        Case "h"
+        sell_hotel = MsgBox("Do you want to sell this hotel?", vbYesNo, "Sell Hotel")
+        If sell_hotel = vbYes Then
+            Call refund_house(active_player, property_row)
+        End If
+        Case ""
+        MsgBox "You can only build/sell on your turn"
+        
+        Case "m"
+        unmortgage = MsgBox("Would you like to unmortgage this property", vbYesNo, "Unmortgage")
+        If unmortgage = vbYes Then
+            '10% flag?
+            fee = (data.Cells(property_row.Row, 2).Value / 2) * 1.1
+            player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2) - fee
+            bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & player_money
+            property_row.Offset(, active_player + 1) = "o"
+            property_row = property_row.Row
+            Call check_complete_set(active_player, property_row)
+            MsgBox "Paid £" & fee & " to unmortgage"
+        End If
+        End Select
+    End If
+Next
+End Sub
+
+Sub refund_house(active_player As Integer, ByVal property_row)
+Set bg = Sheet5
+Set data = Sheet6
+If bg.Shapes("sh_50%").Line.Visible = True Then
+refund_option = 2
+Else: refund_option = 1
+End If
+refund = data.Cells(property_row.Row, 13).Value / refund_option
+player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2) + refund
+bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & player_money
+MsgBox "£" & refund & " Refunded"
+r = property_row.Offset(, active_player + 1)
+If r = 1 Then
+    r = "set"
+ElseIf r = "h" Then
+    r = 4
+Else
+    r = r - 1
+End If
+property_row.Offset(, active_player + 1) = r
+End Sub
+
+Sub mortgage(active_player As Integer, ByVal property_row)
+Set bg = Sheet5
+Set data = Sheet6
+
+refund = data.Cells(property_row.Row, 2).Value / 2
+player_money = Mid(bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text, 2) + refund
+bg.Shapes("money" & active_player).TextFrame2.TextRange.Characters.Text = "£" & player_money
+property_row.Offset(, active_player + 1) = "m"
+MsgBox "Property Mortgaged for £" & refund
+
+End Sub
+
+Sub create_rectangle()
+'
+'For i = 1 To 40
+'
+'ActiveSheet.Shapes.AddShape(msoShapeRectangle, 601.5, 297.75, 159.75, 66.75). _
+'        Select
+'Selection.ShapeRange.Fill.Visible = msoFalse
+'Selection.ShapeRange.Name = "s" & i
+'Next
+'
+End Sub

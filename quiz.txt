@@ -1,0 +1,444 @@
+Sub difficulty()
+
+Dim quiz As Worksheet
+Dim g1 As Shape
+Set quiz = Sheet1
+
+Set g1 = ActiveSheet.Shapes(Application.Caller)
+
+For Each sh In quiz.Shapes
+    Select Case sh.Name
+        
+    Case "easy", "medium", "hard"
+        If sh.Name = g1.Name Then
+            If sh.Fill.GradientStops(1).Color = RGB(255, 255, 255) Then
+                sh.Fill.GradientStops(1).Color = RGB(255, 0, 0)
+                sh.Fill.GradientStops(4).Color = RGB(255, 0, 0)
+                sh.TextFrame.Characters.Font.Color = RGB(0, 0, 0)
+            Else
+                sh.Fill.GradientStops(1).Color.RGB = RGB(255, 255, 255)
+                sh.TextFrame.Characters.Font.Color = RGB(0, 0, 0)
+                sh.Fill.GradientStops(4).Color = RGB(255, 255, 255)
+            End If
+        Else
+            sh.Fill.GradientStops(1).Color.RGB = RGB(255, 255, 255)
+            sh.Fill.GradientStops(4).Color = RGB(255, 255, 255)
+            sh.TextFrame.Characters.Font.Color = RGB(0, 0, 0)
+        End If
+    End Select
+Next
+
+End Sub
+
+Sub category_select()
+
+Dim categories As Worksheet
+Set categories = Sheet2
+Dim quiz As Worksheet
+Set quiz = Sheet1
+Dim cat_box As Shape
+Set cat_box = quiz.Shapes("cat_box")
+Dim easy As Shape, medium As Shape, hard As Shape
+Set easy = quiz.Shapes("easy")
+Set medium = quiz.Shapes("medium")
+Set hard = quiz.Shapes("hard")
+Range("b5") = ""
+
+found = False
+
+cat = Application.InputBox("Enter the number of your chosen category" & vbNewLine & vbNewLine & "Type 0 for a mix")
+If cat = False Then
+    cat_box.TextFrame2.TextRange.Characters.Text = ""
+    Exit Sub
+ElseIf cat = "" Then
+    cat = 0
+    found = True
+End If
+    
+lastcat = categories.Cells(Rows.Count, 1).End(xlUp).Row
+
+For Each categ In categories.Cells(1, 1).Resize(lastcat)
+    If categ = Int(cat) Then
+        found = True
+        cat_box.TextFrame2.TextRange.Characters.Text = categ.Offset(, 1).Value
+        cat_check = "https://opentdb.com/api_count.php?category=" & cat
+        Exit For
+    End If
+Next
+
+If found = False Then
+    MsgBox "That is an invalid category number"
+    Exit Sub
+Else
+
+Dim httpObject As Object
+Set httpObject = CreateObject("MSXML2.XMLHTTP")
+
+    httpObject.Open "GET", cat_check, False
+    httpObject.Send
+    sgetresult = httpObject.ResponseText
+
+Dim rx As Object
+Set rx = New RegExp
+
+    rx.Pattern = "easy[a-z_"":,]*"":([0-9]*)[a-z_"",]*medium[a-z_"":,]*"":([0-9]*)[a-z_"",]*hard[a-z_"":,]*"":([0-9]*)"
+    rx.Global = True
+
+Set matches = rx.Execute(sgetresult)
+
+Count = matches.Count
+
+If Count > 0 Then
+easy.TextFrame2.TextRange.Characters.Text = "Easy " & matches(0).SubMatches(0)
+medium.TextFrame2.TextRange.Characters.Text = "Med " & matches(0).SubMatches(1)
+hard.TextFrame2.TextRange.Characters.Text = "Hard " & matches(0).SubMatches(2)
+End If
+
+Range("b5") = cat
+
+End If
+
+End Sub
+
+Sub num_questions()
+
+Dim quiz As Worksheet
+Set quiz = Sheet1
+Dim q_num As Object
+Set q_num = quiz.Shapes("q_num")
+
+num = Application.InputBox("Enter the number of questions you want. (default is 10)")
+
+If num = False Then
+    q_num.TextFrame2.TextRange.Characters.Text = ""
+    Exit Sub
+ElseIf num = "" Then
+    q_num.TextFrame2.TextRange.Characters.Text = 10
+Else
+    q_num.TextFrame2.TextRange.Characters.Text = num
+End If
+End Sub
+
+Sub show_hide()
+
+Dim quiz As Worksheet
+Set quiz = Sheet1
+Dim cat_box As Shape
+Set cat_box = quiz.Shapes("cat_box")
+
+If cat_box.Visible = True Then
+    For Each sh In ActiveSheet.Shapes
+        Select Case sh.Name
+        Case "tips", "category", "hard", "medium", "easy", "q_num", "number_q", "cat_box", "start"
+        sh.Visible = False
+        End Select
+    Next
+Else
+    For Each sh In ActiveSheet.Shapes
+        Select Case sh.Name
+        Case "tips", "category", "hard", "medium", "easy", "q_num", "number_q", "cat_box", "start"
+        sh.Visible = True
+        End Select
+    Next
+End If
+End Sub
+
+
+Public Function Base64Decode(ByVal base64String)
+  'rfc1521
+  '1999 Antonin Foller, Motobit Software, http://Motobit.cz
+  Const Base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  Dim dataLength, sOut, groupBegin
+  
+  'remove white spaces, If any
+  base64String = Replace(base64String, vbCrLf, "")
+  base64String = Replace(base64String, vbTab, "")
+  base64String = Replace(base64String, " ", "")
+  
+  'The source must consists from groups with Len of 4 chars
+  dataLength = Len(base64String)
+  'If dataLength Mod 4 <> 0 Then
+    'Err.Raise 1, "Base64Decode", "Bad Base64 string."
+    'Exit Function
+  'End If
+
+  
+  ' Now decode each group:
+  For groupBegin = 1 To dataLength Step 4
+    Dim numDataBytes, CharCounter, thisChar, thisData, nGroup, pOut
+    ' Each data group encodes up To 3 actual bytes.
+    numDataBytes = 3
+    nGroup = 0
+
+    For CharCounter = 0 To 3
+      ' Convert each character into 6 bits of data, And add it To
+      ' an integer For temporary storage.  If a character is a '=', there
+      ' is one fewer data byte.  (There can only be a maximum of 2 '=' In
+      ' the whole string.)
+
+      thisChar = Mid(base64String, groupBegin + CharCounter, 1)
+
+      If thisChar = "=" Then
+        numDataBytes = numDataBytes - 1
+        thisData = 0
+      Else
+        thisData = InStr(1, Base64, thisChar, vbBinaryCompare) - 1
+      End If
+      If thisData = -1 Then
+        Err.Raise 2, "Base64Decode", "Bad character In Base64 string."
+        Exit Function
+      End If
+
+      nGroup = 64 * nGroup + thisData
+    Next
+    
+    'Hex splits the long To 6 groups with 4 bits
+    nGroup = Hex(nGroup)
+    
+    'Add leading zeros
+    nGroup = String(6 - Len(nGroup), "0") & nGroup
+    
+    'Convert the 3 byte hex integer (6 chars) To 3 characters
+    pOut = Chr(CByte("&H" & Mid(nGroup, 1, 2))) + _
+      Chr(CByte("&H" & Mid(nGroup, 3, 2))) + _
+      Chr(CByte("&H" & Mid(nGroup, 5, 2)))
+    
+    'add numDataBytes characters To out string
+    sOut = sOut & Left(pOut, numDataBytes)
+  Next
+
+  Base64Decode = sOut
+End Function
+
+
+Sub get_latest_categories()
+
+Dim httpObject As Object
+Set httpObject = CreateObject("MSXML2.XMLHTTP")
+
+sRequest = "https://opentdb.com/api_category.php"
+httpObject.Open "GET", sRequest, False
+httpObject.Send
+getcategory = httpObject.ResponseText
+
+Dim rx As Object
+Set rx = New RegExp
+
+rx.Pattern = "id"":([0-9]{1,2}),""name"":""([A-z:\s&]*)"
+rx.Global = True
+
+Set matches = rx.Execute(getcategory)
+
+Count = matches.Count
+
+If Count = 0 Then
+    MsgBox "There was a problem getting the latest categories"
+    Exit Sub
+End If
+
+Dim categories As Worksheet
+Set categories = Sheet2
+
+lastrow = categories.Cells(Rows.Count, 1).End(xlUp).Row
+lastcol = categories.Cells(1, Columns.Count).End(xlToLeft).Column
+categories.Cells(1, 1).Resize(lastrow, lastcol).ClearContents
+
+r = 1
+
+For m = 0 To Count - 1
+
+On Error Resume Next
+categories.Cells(r, 1) = matches(m).SubMatches(0)
+categories.Cells(r, 2) = matches(m).SubMatches(1)
+categories.Cells(r, 3) = matches(m).SubMatches(2)
+r = r + 1
+Next
+
+For Each cell In Cells(1, 1).Resize(Count)
+If cell.Row Mod 2 = 0 Then
+    cell.Resize(, 2).Font.Color = RGB(0, 255, 0)
+End If
+Next
+End Sub
+
+
+Sub import_questions()
+
+Dim quiz As Worksheet
+Set quiz = Sheet1
+Dim q_num As Object
+Set q_num = quiz.Shapes("q_num")
+
+Dim httpObject As Object
+Set httpObject = CreateObject("MSXML2.XMLHTTP")
+
+difficulty = ""
+
+For Each sh In ActiveSheet.Shapes
+    Select Case sh.Name
+        Case "easy", "medium", "hard"
+            If sh.Fill.GradientStops(1).Color = RGB(255, 0, 0) Then
+            difficulty = sh.Name
+            Exit For
+            End If
+    End Select
+Next
+
+If q_num.TextFrame2.TextRange.Characters.Text <> "" Then
+    surl = "https://opentdb.com/api.php?amount=" & q_num.TextFrame2.TextRange.Characters.Text
+Else
+    surl = "https://opentdb.com/api.php?amount=10"
+End If
+
+If Range("b5") <> "" Then
+    surl = surl & "&category=" & Range("b5")
+End If
+
+If difficulty <> "" Then
+    surl = surl & "&difficulty=" & difficulty & "&encode=base64"
+Else
+    surl = surl & "&encode=base64"
+End If
+
+MsgBox surl
+'surl = "https://opentdb.com/api.php?amount=10&category=15&difficulty=hard&type=multiple&encode=base64"
+
+sRequest = surl
+httpObject.Open "GET", sRequest, False
+httpObject.Send
+sgetresult = httpObject.ResponseText
+
+Dim rx As Object
+Set rx = New RegExp
+ 
+rx.Pattern = "category"":""([A-Z0-9a-z]*=?=?)["",A-z:=0-9]*question"":""([A-Z0-9a-z]*=?=?)\\?\/?"",""correct_answer"":""([A-Z0-9a-z]*=?=?)"",""incorrect_answers"":\[""(?:([A-z0-9=]*)""?.?""?)(?:([A-z0-9=]*)""?,?""?)["",]*?([A-z0-9=]*)"
+rx.Global = True
+
+Set matches = rx.Execute(sgetresult)
+
+Count = matches.Count
+
+flag = False
+For Each Sheet In ActiveWorkbook.Sheets
+    If Sheet.Name = "Questions" Then
+        flag = True
+        Exit For
+    End If
+Next
+
+If Not flag Then
+    Sheets.Add.Name = "Questions"
+End If
+
+
+quiz.Select
+
+Dim questions As Worksheet
+Set questions = Sheets("Questions")
+
+questions.Visible = xlSheetHidden
+
+r = 1
+
+For m = 0 To Count - 1
+
+On Error Resume Next
+questions.Cells(r, 1) = Base64Decode(matches(m).SubMatches(0))
+questions.Cells(r, 2) = Base64Decode(matches(m).SubMatches(1))
+questions.Cells(r, 3) = Base64Decode(matches(m).SubMatches(2))
+questions.Cells(r, 4) = Base64Decode(matches(m).SubMatches(3))
+questions.Cells(r, 5) = Base64Decode(matches(m).SubMatches(4))
+questions.Cells(r, 6) = Base64Decode(matches(m).SubMatches(5))
+
+r = r + 1
+
+Next
+
+Dim streak As Shape
+Set streak = quiz.Shapes("streak")
+
+streak.TextFrame2.TextRange.Characters.Text = 0
+
+Call start
+
+End Sub
+
+Sub start()
+
+Dim questions As Worksheet
+Dim quiz As Worksheet
+Set questions = Sheets("questions")
+Set quiz = Sheet1
+
+Dim q_box As Shape
+Set q_box = quiz.Shapes("q_box")
+
+lastq = questions.Cells(Rows.Count, 2).End(xlUp).Row
+
+random_q = Int((lastq - 1 + 1) * Rnd + 1)
+
+q_box.TextFrame2.TextRange.Characters.Text = questions.Cells(random_q, 2).Value
+
+lastcol = questions.Cells(random_q, Columns.Count).End(xlToLeft).Column
+If lastcol = 4 Then
+    quiz.Shapes.Range(Array("a3")).Visible = False
+    quiz.Shapes.Range(Array("a4")).Visible = False
+End If
+
+questions.Cells(1, 1).Offset(lastq) = questions.Cells(random_q, 3).Value
+
+For a = 1 To lastcol - 2
+random_n:
+r = Int((6 - 3 + 1) * Rnd + 3)
+
+If questions.Cells(random_q, r).Value = "" Then
+    GoTo random_n
+Else
+    a_box = "a" & a
+    quiz.Shapes.Range(Array(a_box)).Visible = msoCTrue
+    quiz.Shapes.Range(Array(a_box)).TextFrame2.TextRange.Characters.Text = questions.Cells(random_q, r).Value
+    questions.Cells(random_q, r).Value = ""
+End If
+Next
+
+questions.Cells(random_q, 1).EntireRow.Delete
+Range("e13") = "Click the question to skip"
+
+End Sub
+
+Sub submit_answer()
+
+Dim questions As Worksheet
+Set questions = Sheets("questions")
+Dim quiz As Worksheet
+Set quiz = Sheet1
+Dim clicked As Object
+Set clicked = ActiveSheet.Shapes(Application.Caller)
+Dim q_box As Shape
+Set q_box = quiz.Shapes("q_box")
+Dim streak As Shape
+Set streak = quiz.Shapes("streak")
+Dim answer As String
+
+lastrow = questions.Cells(Rows.Count, 1).End(xlUp).Row
+answer = questions.Cells(1, 1).Offset(lastrow - 1).Value
+
+If clicked.TextFrame.Characters.Text = answer Then
+    q_box.TextFrame2.TextRange.Characters.Text = "CORRECT"
+    streak.TextFrame2.TextRange.Characters.Text = streak.TextFrame2.TextRange.Characters.Text + 1
+    For Each sh In ActiveSheet.Shapes
+        Select Case sh.Name
+        Case "a1", "a2", "a3", "a4"
+        sh.Visible = False
+        End Select
+    Next
+    Range("e13") = "Click correct to continue"
+Else
+    clicked.Visible = False
+    streak.TextFrame2.TextRange.Characters.Text = 0
+End If
+
+If questions.Cells(2, 1).Value = "" Then
+    q_box.TextFrame2.TextRange.Characters.Text = "You have completed your allocated questions, current score is " & streak.TextFrame2.TextRange.Characters.Text
+End If
+End Sub

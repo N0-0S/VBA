@@ -1,0 +1,56 @@
+Sub wipeout_select()
+
+Call unlocked
+Call lockdown
+
+Dim g1 As Shape
+
+Set g1 = ActiveSheet.Shapes(Application.Caller)
+
+If g1.Fill.GradientStops(1).Color = RGB(0, 0, 0) Then
+    g1.Fill.GradientStops(1).Color = RGB(50, 200, 255)
+    g1.TextFrame.Characters.Font.Color = RGB(0, 0, 0)
+    Cells(18, 4).Value = Cells(18, 4).Value + 1
+Else
+    g1.Fill.GradientStops(1).Color.RGB = RGB(0, 0, 0)
+    g1.TextFrame.Characters.Font.Color = RGB(255, 255, 255)
+    Cells(18, 4).Value = Cells(18, 4).Value - 1
+End If
+
+End Sub
+
+Sub wipeout_win()
+
+Dim win As Integer
+
+win = 0
+
+For Each sh In ActiveSheet.Shapes
+
+Select Case sh.TextFrame.Characters.Text
+    
+Case "Jaws", "Jaws 2", "It", "Gremlins", "The Exorcist", "Alien", "The Amytiville Horror", "Ghostbusters", "The Sixth Sense", "Scary Movie"
+If sh.Fill.GradientStops(1).Color = RGB(50, 200, 255) Then
+    win = win + 1
+End If
+End Select
+Next
+
+Cells(18, "w") = win
+    
+If win = 10 Then
+
+For Each sh In ActiveSheet.Shapes
+
+Select Case sh.TextFrame.Characters.Text
+
+Case "Jaws", "Jaws 2", "It", "Gremlins", "The Exorcist", "Alien", "The Amytiville Horror", "Ghostbust-ers", "The Sixth Sense", "Scary Movie"
+'nothing
+Case Else
+
+sh.Visible = False
+End Select
+Next
+End If
+
+End Sub
